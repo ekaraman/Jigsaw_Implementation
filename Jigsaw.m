@@ -1,11 +1,12 @@
 clear all;
 
-% read in an image
+% read an image
 I = double(imread('C:\Users\KARAMAN\Google Drive\RESEARCH\Jigsaw_Epitome\Jigsaw_Implementation\128_Dog.png'))/255;
 
 %constants
 beta = 1;
 mean_0 = 0.5;
+
 % the size of the jigsaw 
 jSize = [32 32 3];
 
@@ -117,18 +118,25 @@ sJ = [jSize(1), jSize(1)];
 for i = 1: iALSize 
     xIndex = find (label == i);
    [Xj,Yj] = ind2sub(sJ,i);
-    if (isEmpty(xIndex) == 0)
+    if (isempty(xIndex) == 0)
         xDim = size (xIndex,1);
         for j = 1 : 3
             xZ = 0;
+            xZ2 = 0;
             for k = 1 : xDim
                 %Convert 1D label index to 2D image index 
                 [Xi,Yi] = ind2sub(sI,xIndex(k));
                 xZ = xZ + I (Xi,Yi,j);
+                xZ2 = xZ + (I (Xi,Yi,j)^2);
             end
-            jMean(Xj,Yj,j) = (((beta * mean_0) + xZ) / (beta +xDim));
+            jMean(Xj,Yj,j) = (((beta * mean_0) + xZ) / (beta + xDim));
+            jVar(Xj,Yj,j) = ((b(:,:,j) + (beta * mean_0^2) - ((beta + xDim) * jMean(Xj,Yj,j)^2) + xZ2 ) / (a(:,:,j) + xDim));
         end
     end
 end
 
-jMean
+figure, imagesc(jMean), title('Jigsaw');
+
+
+
+
