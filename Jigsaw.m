@@ -4,12 +4,14 @@ clear all;
 I = double(imread('C:\Users\KARAMAN\Google Drive\RESEARCH\Jigsaw_Epitome\Jigsaw_Implementation\128_Dog.png'))/255;
 
 % the size of the jigsaw 
-jSize = [32 32 3];
+jSize = [3 32 32];
 
 %Initialize jigsaw mean, jigsaw variance and offset map L matrices
-jMean = zeros(jSize);
+jMean = zeros(jSize) - 1;
 jVar = zeros(jSize);
 L = zeros (size(I(:,:,1))); % size of 128 x 128
+reconsImage = zeros (size(I));
+reconsNoisyImage = zeros (size(I));
 
 %Acoording to the paper:
 %For our experiments,
@@ -43,18 +45,32 @@ a = b.^2;
 
 %Initialize Jigsaw Variance
 for i = 1 : Isize(end)
-    jVar(:,:,i) = b(i) / a(i);
+    jVar(i,:,:) = b(i) / a(i);
 end
 
-%Initialize Jigsaw Mean
-for i = 1 : Isize(end)
-    jMean (:,:,i) = random('norm', pixelMean(1,i), pixelVar(1,i), jSize(1) , jSize(1));
+%Initialize Jigsaw Mean and making sure to keep the pixels between 0 and 1
+done = false;
+while(~done)
+    done = true;
+    
+    for i = 1 : Isize(end)
+        idx = jMean (i,:,:) < 0 | jMean (i,:,:) > 1;
+        N = sum(idx(:));
+        
+        if(N > 0)
+            done = false;
+            jMean(i,idx) = randn(N,1) .* pixelStd(1,i) + pixelMean(1,i);
+        end
+    end
 end
 
+%il basta kodu yazarken jMean size 32 32 3 almýstým o yuzden tekrar 
+%ayný þekle dönüyorumç
+jMean = permute(jMean,[2 3 1]);
 
 %Find size of Data_Cost matrix
 iASize = Isize(1)^2; %column size of data cost matrix = 16384
-iALSize = jSize (1)^2; % row size of data cost matrix = 1024
+iALSize = jSize (2)^2; % row size of data cost matrix = 1024
 
 % DATA COST Nedir?
 % Data Cost: Resimdeki her bir pixele jigsawdaki pixellerin atanmasý
@@ -95,6 +111,7 @@ adj = adj+adj.';                          %'# Add the matrix to a transposed
                                           %#   symmetric
 %adj
 triuAdj = triu(adj);
+triuAdj = triuAdj .* 5;
 %Kod sparse matrix kullanýyor
 Sadj = sparse(triuAdj);
 %End of setting of neighborhood 
@@ -103,9 +120,8 @@ Sadj = sparse(triuAdj);
 %getirilmiþtir.
 Iarray = reshape (I,[1,iASize,3]);
 
-
 %Beginning of EM algorithm
-for em = 1 : 1 %Beginning of EM iteration
+for em = 1 : 10 %Beginning of EM iteration
 
 disp ('EM iteration nu=');
 em
@@ -127,7 +143,7 @@ for i = 1 : iALSize
 %ediyor. Ben de bu nedenle elde ettiðim data cost deðerlerini 1000 ile
 %çarparak en yakýn integer deðere yuvarladým.
 
-        dataCost(i,j) = dataCost(i,j) * 1000;
+        dataCost(i,j) = dataCost(i,j) * 100;
         
     end
 end
@@ -163,14 +179,14 @@ for i = 1 : iALSize
         if (i == j) 
             smoothCost(i,j) = 0;
         else
-            smoothCost(i,j)  = 5;
+            smoothCost(i,j)  = 1;
         end
     end
 end
 
 %Smooth cost graph cut algoritmasý için set ediliyor.
 disp ('setting smooth cost');
-GCO_SetSmoothCost(h,smoothCost);
+%GCO_SetSmoothCost(h,smoothCost);
 
 %Neighborhood graphcut için set ediliyor.
 disp ('setting neighborhood matrix');
@@ -185,6 +201,10 @@ GCO_Expansion(h);
 disp('Show labels');
 label = GCO_GetLabeling(h);
 
+%Show calculated energies
+disp('Show energies');
+[E D S] = GCO_ComputeEnergy(h)
+
 %Update Jigsaw Mean
 disp('Update Jigsaw Mean');
 
@@ -192,7 +212,7 @@ disp('Update Jigsaw Mean');
 
 %Find the set of image pixels that are mapped to the jigsaw pixel z
 sI = [Isize(1), Isize(1)];% [128 128]
-sJ = [jSize(1), jSize(1)];% [32 32]
+sJ = [jSize(2), jSize(2)];% [32 32]
 
 
 for i = 1: iALSize 
@@ -228,12 +248,34 @@ for i = 1: iALSize
             jMean(Xj,Yj,j) = (((beta * mean_0) + xZ) / (beta + xDim));
             jVar(Xj,Yj,j) = ((b(:,:,j) + (beta * mean_0^2) - ((beta + xDim) * jMean(Xj,Yj,j)^2) + xZ2 ) / (a(:,:,j) + xDim));
         end
+    else
+        for j = 1 : 3
+            xZ = 0;
+            xZ2 = 0;
+            xDim = 0;
+            jMean(Xj,Yj,j) = (((beta * mean_0) + xZ) / (beta + xDim));
+            jVar(Xj,Yj,j) = ((b(:,:,j) + (beta * mean_0^2) - ((beta + xDim) * jMean(Xj,Yj,j)^2) + xZ2 ) / (a(:,:,j) + xDim));
+        end
+    end
+end
+%figure, imagesc(jMean), title('Jigsaw');
+end %end of EM iteration
+
+%Reconstruct image
+for i = 1 : iASize
+    [Xi,Yi] = ind2sub(sI,i);
+    label_index = label(i);
+    [Xj,Yj] = ind2sub(sJ,label_index);
+    for j = 1 : 3
+        reconsImage(Xi,Yi,j) = jMean(Xj,Yj,j);
+        reconsNoisyImage(Xi,Yi,j) = imnoise(reconsImage(Xi,Yi,j),'localvar',jVar(Xj,Yj,j));
     end
 end
 
-end %end of EM iteration
-imwrite(jMean,'jigsaw.png');
-%figure, imagesc(jMean), title('Jigsaw');
+figure, imagesc(reconsImage), title('Reconstructed Image');
+figure, imagesc(reconsNoisyImage), title('Reconstructed Noisy Image');
+%imwrite(jMean,'jigsaw.png');
+
 
 
 
