@@ -67,7 +67,7 @@ end
 %il basta kodu yazarken jMean size 32 32 3 almýstým o yuzden tekrar 
 %ayný þekle dönüyorumç
 jMean = permute(jMean,[2 3 1]);
-
+jVar = permute(jVar,[2 3 1]);
 %Find size of Data_Cost matrix
 iASize = Isize(1)^2; %column size of data cost matrix = 16384
 iALSize = jSize (2)^2; % row size of data cost matrix = 1024
