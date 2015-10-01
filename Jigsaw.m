@@ -3,6 +3,7 @@ clear all;
 % read an image
 I = double(imread('C:\Users\KARAMAN\Google Drive\RESEARCH\Jigsaw_Epitome\Jigsaw_Implementation\128_Dog.png'))/255;
 
+figure, imagesc(I), title('Original Image');
 % the size of the jigsaw 
 jSize = [3 32 32];
 
@@ -173,20 +174,34 @@ GCO_SetDataCost(h,dataCost);
 
 disp ('setting smooth cost matrix');
 %Calculate Smooth Cost
-smoothCost = int32(zeros (iALSize, iALSize));
+% smoothCost = int32(zeros (iALSize, iALSize));
+% for i = 1 : iALSize
+%     for j = 1 : iALSize
+%         if (i == j) 
+%             smoothCost(i,j) = 0;
+%         else
+%             smoothCost(i,j)  = 1;
+%         end
+%     end
+% end
+
+smoothCost = int32(ones (iALSize, iALSize)).*1;
 for i = 1 : iALSize
-    for j = 1 : iALSize
-        if (i == j) 
-            smoothCost(i,j) = 0;
-        else
-            smoothCost(i,j)  = 1;
-        end
+    if (i == 1) 
+        smoothCost(i,i+1)= 0;
+        %smoothCost(i,i)=0;
+    elseif(i == iALSize)
+        smoothCost(i,i-1) = 0;
+        %smoothCost(i,i)=0;
+    else
+        smoothCost(i,i+1) = 0;
+        smoothCost(i,i-1) = 0;
+        %smoothCost(i,i)=0;
     end
 end
-
 %Smooth cost graph cut algoritmasý için set ediliyor.
 disp ('setting smooth cost');
-%GCO_SetSmoothCost(h,smoothCost);
+GCO_SetSmoothCost(h,smoothCost);
 
 %Neighborhood graphcut için set ediliyor.
 disp ('setting neighborhood matrix');
